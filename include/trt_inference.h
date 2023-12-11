@@ -15,6 +15,7 @@
 #include "logging.h"
 #include "mish.h"
 #include "yololayer.h"
+#include <algorithm>
 
 using namespace nvinfer1;
 
@@ -29,7 +30,9 @@ namespace IMXAIEngine
 
     typedef struct
     {
-            
+        uint32_t ClassID;	
+		float Confidence;	
+        float bbox[4];
     } trt_results;
     
 
@@ -59,7 +62,7 @@ namespace IMXAIEngine
         }
         trt_error init_inference(const char * input_folder, std::vector<std::string> &file_names); 
         trt_error trt_APIModel();
-        trt_error trt_detection(std::string folder , std::vector<std::string> &file_names);
+        trt_error trt_detection(std::vector<cv::Mat> &input_img, std::vector< std::vector<trt_results>> &results);
     };
 
 } // namespace IMXAIEngine

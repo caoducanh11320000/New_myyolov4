@@ -1,27 +1,17 @@
 #include <iostream>
 #include "trt_inference.h"
-// #include "yololayer.h" // thu ko include xem co bao loi ko
 
-// #define USE_FP16  // comment out this if want to use FP32
 #define DEVICE 0  // GPU id
-// #define NMS_THRESH 0.4
-// #define BBOX_CONF_THRESH 0.5
-// #define BATCH_SIZE 1
+
 
 using namespace IMXAIEngine;
 using namespace nvinfer1;
 
-// // do the thay doi sau
-// static const int INPUT_H = Yolo::INPUT_H;
-// static const int INPUT_W = Yolo::INPUT_W;
-// static const int DETECTION_SIZE = sizeof(Yolo::Detection) / sizeof(float);
-// static const int OUTPUT_SIZE = Yolo::MAX_OUTPUT_BBOX_COUNT * DETECTION_SIZE + 1;  // we assume the yololayer outputs no more than MAX_OUTPUT_BBOX_COUNT boxes that conf >= 0.1
-// const char* INPUT_BLOB_NAME = "data";
-// const char* OUTPUT_BLOB_NAME = "prob";
-// static Logger gLogger;
 
 TRT_Inference test1;
 std::vector<std::string> file_image;
+std::vector<cv::Mat> input_img; 
+std::vector< std::vector<trt_results>> results;
 
 int main(int argc, char** argv){
 
@@ -29,7 +19,7 @@ int main(int argc, char** argv){
 
     if (argc == 2 && std::string(argv[1]) == "-s") {
         // co the goi ham API model o day
-        trt_error error1=  test1.trt_APIModel();     
+        test1.trt_APIModel();     
     } 
     else if (argc == 3 && std::string(argv[1]) == "-d") {
         // goi ham init
@@ -44,6 +34,27 @@ int main(int argc, char** argv){
 
     /// thuc hien ham do_Inference o day
     std::string folder= std::string(argv[2]);
-    test1.trt_detection(folder, file_image);
+    for(int i=0; i< (int)file_image.size(); i++){
+        cv::Mat img = cv::imread(folder + "/" + file_image[i]);
+        if(!img.empty()) input_img.push_back(img);
+        else std::cout << "That bai" << std::endl;
+    }
+    for (int i=0; i< (int)file_image.size(); i++)
+    {
+        std::cout <<"Ten anh la:" << file_image[i] <<std::endl;
+    }
+    
+  
+    test1.trt_detection(input_img, results);
+    std::cout << results.size() << std::endl;
+    for (int i = 0; i < (int)results.size(); i++)
+    {
+        auto x= results[i];
+        std::cout <<"Anh" << std::endl;
+        for(int j=0; j< (int)x.size(); j++){
+            std::cout <<"Bounding box: " << x[j].ClassID << x[i].Confidence << x[i].bbox[0]<< x[i].bbox[1] << x[i].bbox[2] << x[i].bbox[3] <<std::endl;
+        }
+    }
+    
 
 }

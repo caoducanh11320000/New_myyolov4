@@ -615,17 +615,116 @@ trt_error TRT_Inference::init_inference(const char * input_folder, std::vector<s
     return TRT_RESULT_SUCCESS;
 }
 
-trt_error TRT_Inference::trt_detection(std::string folder , std::vector<std::string> &file_names){
+bool isImage(const std::string& filename) {
+    // Danh sách các phần mở rộng cho ảnh
+    std::vector<std::string> imageExtensions = {".jpg", ".jpeg", ".png", ".bmp"};
+
+    // Tìm phần mở rộng của tệp
+    size_t dotPosition = filename.find_last_of(".");
+    if (dotPosition != std::string::npos) {
+        std::string extension = filename.substr(dotPosition);
+        
+        // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+
+        // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của ảnh không
+        if (std::find(imageExtensions.begin(), imageExtensions.end(), extension) != imageExtensions.end()) return true;
+        return false;
+    }
+
+    // Nếu không có phần mở rộng, giả định là không phải ảnh
+    return false;
+}
+
+bool isVideo(const std::string& filename) {
+    // Danh sách các phần mở rộng cho video
+    std::vector<std::string> videoExtensions = {".mp4", ".avi", ".mkv"};
+
+    // Tìm phần mở rộng của tệp
+    size_t dotPosition = filename.find_last_of(".");
+    if (dotPosition != std::string::npos) {
+        std::string extension = filename.substr(dotPosition);
+        
+        // Chuyển đổi phần mở rộng thành chữ thường để so sánh không phân biệt chữ hoa chữ thường
+        std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+
+        // Kiểm tra xem phần mở rộng có trong danh sách phần mở rộng của video không
+        if( std::find(videoExtensions.begin(), videoExtensions.end(), extension) != videoExtensions.end()) return true;
+        return false;
+    }
+
+    // Nếu không có phần mở rộng, giả định là không phải video
+    return false;
+}
+
+// trt_error TRT_Inference::trt_detection(std::string folder , std::vector<std::string> &file_names){
+//     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
+//     static float prob[BATCH_SIZE * OUTPUT_SIZE];
+//     // duyet qua tung anh
+
+//     // Test ten anh
+//     for (int i=0; i< (int)file_names.size() ; i++ )
+//     {
+//         std::cout << "Ten anh:" << file_names[i] << std::endl;
+//     }
+    
+//     int fcount = 0;
+//     for (int f = 0; f < (int)file_names.size(); f++) {
+       
+
+//         fcount++;
+//         if (fcount < BATCH_SIZE && f + 1 != (int)file_names.size()) continue;
+//         for (int b = 0; b < fcount; b++) {
+//             cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
+//             if (img.empty()) continue;
+//             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
+//             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
+//                 data[b * 3 * INPUT_H * INPUT_W + i] = pr_img.at<cv::Vec3b>(i)[2] / 255.0;
+//                 data[b * 3 * INPUT_H * INPUT_W + i + INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[1] / 255.0;
+//                 data[b * 3 * INPUT_H * INPUT_W + i + 2 * INPUT_H * INPUT_W] = pr_img.at<cv::Vec3b>(i)[0] / 255.0;
+//             }
+//         }
+
+//         // Run inference
+//         auto start = std::chrono::system_clock::now();
+//         doInference(*context, data, prob, BATCH_SIZE);
+//         auto end = std::chrono::system_clock::now();
+//         std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+        
+//         std::vector<std::vector<Yolo::Detection>> batch_res(fcount);
+//         for (int b = 0; b < fcount; b++) {
+//             auto& res = batch_res[b];
+//             nms(res, &prob[b * OUTPUT_SIZE]);
+//         }
+//         for (int b = 0; b < fcount; b++) {
+//             auto& res = batch_res[b];
+//             //std::cout << res.size() << std::endl;
+//             cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
+//             for (size_t j = 0; j < res.size(); j++) {
+//                 cv::Rect r = get_rect(img, res[j].bbox);
+//                 cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
+//                 cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
+//             }
+//             cv::imwrite("_" + file_names[f - fcount + 1 + b], img);
+//         }
+//         fcount = 0;
+//     }
+    
+
+//     return TRT_RESULT_SUCCESS;
+// }
+
+trt_error TRT_Inference::trt_detection(std::vector<cv::Mat> &input_img, std::vector< std::vector<trt_results>> &results){
     static float data[BATCH_SIZE * 3 * INPUT_H * INPUT_W];
     static float prob[BATCH_SIZE * OUTPUT_SIZE];
-    // duyet qua tung anh
+
     int fcount = 0;
-    for (int f = 0; f < (int)file_names.size(); f++) {
+    for (int f = 0; f < (int)input_img.size(); f++) {    
         fcount++;
-        if (fcount < BATCH_SIZE && f + 1 != (int)file_names.size()) continue;
+        if (fcount < BATCH_SIZE && f + 1 != (int)input_img.size()) continue;
+        // xu li anh
         for (int b = 0; b < fcount; b++) {
-            cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
-            if (img.empty()) continue;
+            cv::Mat img = input_img[f - fcount + 1 + b];
             cv::Mat pr_img = preprocess_img(img); // goi ham su li anh
             for (int i = 0; i < INPUT_H * INPUT_W; i++) {
                 data[b * 3 * INPUT_H * INPUT_W + i] = pr_img.at<cv::Vec3b>(i)[2] / 255.0;
@@ -646,23 +745,26 @@ trt_error TRT_Inference::trt_detection(std::string folder , std::vector<std::str
             nms(res, &prob[b * OUTPUT_SIZE]);
         }
         for (int b = 0; b < fcount; b++) {
-            auto& res = batch_res[b];
-            //std::cout << res.size() << std::endl;
-            cv::Mat img = cv::imread(folder + "/" + file_names[f - fcount + 1 + b]);
+            auto& res = batch_res[b]; // res[2].ClassID va res[2].class_id khac gi nhau
+            std::vector <trt_results> image_result;
+
             for (size_t j = 0; j < res.size(); j++) {
-                //float *p = (float*)&res[j];
-                //for (size_t k = 0; k < 7; k++) {
-                //    std::cout << p[k] << ", ";
-                //}
-                //std::cout << std::endl;
-                cv::Rect r = get_rect(img, res[j].bbox);
-                cv::rectangle(img, r, cv::Scalar(0x27, 0xC1, 0x36), 2);
-                cv::putText(img, std::to_string((int)res[j].class_id), cv::Point(r.x, r.y - 1), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar(0xFF, 0xFF, 0xFF), 2);
+                trt_results boundingbox_result;
+                boundingbox_result.ClassID = res[j].class_id;
+                boundingbox_result.Confidence= res[j].det_confidence;
+                boundingbox_result.bbox[0]= res[j].bbox[0];
+                boundingbox_result.bbox[1]= res[j].bbox[1];
+                boundingbox_result.bbox[2]= res[j].bbox[2];
+                boundingbox_result.bbox[3]= res[j].bbox[3];
+
+                image_result.push_back(boundingbox_result);
             }
-            cv::imwrite("_" + file_names[f - fcount + 1 + b], img);
+            results.push_back(image_result);
         }
+
         fcount = 0;
     }
+    
 
     return TRT_RESULT_SUCCESS;
 }
